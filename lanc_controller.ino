@@ -4,8 +4,10 @@
 #define teleButton 3
 #define wideButton 4
 #define bitDuration 96 //Duration of one LANC bit in microseconds.
-int cmdRepeatCount;
-int wide = 0x280E;
+
+//lanc command
+#define WIDE 0x280E
+#define REC 0x2841
 
 
 void setup() {
@@ -13,10 +15,11 @@ void setup() {
 	pinMode(lancPin, INPUT); //listens to the LANC line
 	pinMode(cmdPin, OUTPUT); //writes to the LANC line
 	pinMode(recButton, INPUT); //start-stop recording button
-	digitalWrite(recButton, HIGH); //turn on an internal pull up resistor
 	pinMode(teleButton, INPUT); //start-stop recording button
-	digitalWrite(teleButton, HIGH); //turn on an internal pull up resistor
 	pinMode(wideButton, INPUT); //start-stop recording button
+
+	digitalWrite(recButton, HIGH); //turn on an internal pull up resistor
+	digitalWrite(teleButton, HIGH); //turn on an internal pull up resistor
 	digitalWrite(wideButton, HIGH); //turn on an internal pull up resistor
 	digitalWrite(cmdPin, LOW); //set LANC line to +5V
 	delay(5000); //Wait for camera to power up completly
@@ -25,19 +28,19 @@ void setup() {
 
 void loop() {
 	if (!digitalRead(recButton)) {
-		send2(0x2841);
+		send2(WIDE);
 	}
 	if (!digitalRead(teleButton)) {
 		send(B00101000, B00011110); //send a command to camera with Blue Button
 	}
 	if (!digitalRead(wideButton)) {
-		send2(wide); //send a command to camera with Blue Button
+		send2(WIDE); //send a command to camera with Blue Button
 	}
 
 }
 
 void send(unsigned char cmd1, unsigned char cmd2){
-	for (int cmdRepeatCount = 0; cmdRepeatCount < 1; cmdRepeatCount++) {  //repeat 5 times to make sure the camera accepts the command
+	for (int cmdRepeatCount = 0; cmdRepeatCount < 3; cmdRepeatCount++) {  //repeat 3 times to make sure the camera accepts the command
 
 		while (pulseIn(lancPin, HIGH) < 5000) {
 			//"pulseIn, HIGH" catches any 0V TO +5V TRANSITION and waits until the LANC line goes back to 0V
@@ -75,7 +78,7 @@ void send(unsigned char cmd1, unsigned char cmd2){
 		and just wait for the next start bit after a long pause to send the first two command bytes again.*/
 
 
-	}//While cmdRepeatCount < 5
+	}//While cmdRepeatCount < 3
 }
 
 void send2(int cmd) {
@@ -110,4 +113,13 @@ void send2(int cmd) {
 	}
 	//Byte 1 is written now put LANC line back to +5V
 	digitalWrite(cmdPin, LOW);
+}
+
+void serialEvent() {
+	if (Serial.available()>= 2) {
+		int cmd1 = Serial.read();
+		int cmd2 = Serial.read();
+		//Serial.println(cmd);
+		send2(cmd1 >> 2 + cmd2);
+	}
 }
