@@ -1,14 +1,12 @@
+#include "command.h"
+#include "Arduino.h"
+
 #define cmdPin 7
 #define lancPin 11
 #define recButton 2
 #define teleButton 3
 #define wideButton 4
 #define bitDuration 96 //Duration of one LANC bit in microseconds.
-
-//lanc command
-#define WIDE 0x280E
-#define REC 0x2841
-
 
 void setup() {
 	Serial.begin(9600);
@@ -28,19 +26,18 @@ void setup() {
 
 void loop() {
 	if (!digitalRead(recButton)) {
-		send2(WIDE);
+		sendCommand (AutoFocus);
 	}
 	if (!digitalRead(teleButton)) {
-		send(B00101000, B00011110); //send a command to camera with Blue Button
+		sendCommand (TELE8); //send a command to camera with Blue Button
 	}
 	if (!digitalRead(wideButton)) {
-		send2(WIDE); //send a command to camera with Blue Button
+		sendCommand (WIDE8); //send a command to camera with Blue Button
 	}
-
 }
 
-void send(unsigned char cmd1, unsigned char cmd2){
-	for (int cmdRepeatCount = 0; cmdRepeatCount < 3; cmdRepeatCount++) {  //repeat 3 times to make sure the camera accepts the command
+void sendCommand(int cmd) {
+	for (int cmdRepeatCount = 0; cmdRepeatCount < 3; cmdRepeatCount++) { //repeat 3 times to make sure the camera accepts the command
 
 		while (pulseIn(lancPin, HIGH) < 5000) {
 			//"pulseIn, HIGH" catches any 0V TO +5V TRANSITION and waits until the LANC line goes back to 0V
@@ -51,8 +48,8 @@ void send(unsigned char cmd1, unsigned char cmd2){
 		//LOW after long pause means the START bit of Byte 0 is here
 		delayMicroseconds(bitDuration);  //wait START bit duration
 
-		for (int i = 0; i<8; i++) {
-			digitalWrite(cmdPin, (cmd1 & (1 << i)) ? HIGH : LOW);  //Write bit 0.
+		for (int i = 8; i < 16; i++) {
+			digitalWrite(cmdPin, (cmd & (1 << i)) ? HIGH : LOW);  //Write bit 0.
 			delayMicroseconds(bitDuration);
 		}
 
@@ -67,59 +64,20 @@ void send(unsigned char cmd1, unsigned char cmd2){
 		//0V after the previous stop bit means the START bit of Byte 1 is here
 		delayMicroseconds(bitDuration);  //wait START bit duration
 
-		for (int i = 0; i<8; i++) {
-			digitalWrite(cmdPin, (cmd2 & (1 << i)) ? HIGH : LOW);  //Write bit 0.
+		for (int i = 0; i < 8; i++) {
+			digitalWrite(cmdPin, (cmd & (1 << i)) ? HIGH : LOW);  //Write bit 0.
 			delayMicroseconds(bitDuration);
 		}
 		//Byte 1 is written now put LANC line back to +5V
 		digitalWrite(cmdPin, LOW);
-
-		/*Control bytes 0 and 1 are written, now donE½ft care what happens in Bytes 2 to 7
-		and just wait for the next start bit after a long pause to send the first two command bytes again.*/
-
-
-	}//While cmdRepeatCount < 3
-}
-
-void send2(int cmd) {
-	while (pulseIn(lancPin, HIGH) < 5000) {
-		//"pulseIn, HIGH" catches any 0V TO +5V TRANSITION and waits until the LANC line goes back to 0V
-		//"pulseIn" also returns the pulse duration so we can check if the previous +5V duration was long enough (>5ms) to be the pause before a new 8 byte data packet
-		//Loop till pulse duration is >5ms
 	}
-
-	//LOW after long pause means the START bit of Byte 0 is here
-	delayMicroseconds(bitDuration);  //wait START bit duration
-
-	for (int i = 8; i<16; i++) {
-		digitalWrite(cmdPin, (cmd & (1 << i)) ? HIGH : LOW);  //Write bit 0.
-		delayMicroseconds(bitDuration);
-	}
-
-	//Byte 0 is written now put LANC line back to +5V
-	digitalWrite(cmdPin, LOW);
-	delayMicroseconds(10); //make sure to be in the stop bit before byte 1
-
-	while (digitalRead(lancPin)) {
-		//Loop as long as the LANC line is +5V during the stop bit
-	}
-
-	//0V after the previous stop bit means the START bit of Byte 1 is here
-	delayMicroseconds(bitDuration);  //wait START bit duration
-
-	for (int i = 0; i<8; i++) {
-		digitalWrite(cmdPin, (cmd & (1 << i)) ? HIGH : LOW);  //Write bit 0.
-		delayMicroseconds(bitDuration);
-	}
-	//Byte 1 is written now put LANC line back to +5V
-	digitalWrite(cmdPin, LOW);
 }
 
 void serialEvent() {
-	if (Serial.available()>= 2) {
+	if (Serial.available() >= 2) {
 		int cmd1 = Serial.read();
 		int cmd2 = Serial.read();
 		//Serial.println(cmd);
-		send2(cmd1 >> 2 + cmd2);
+		sendCommand((cmd1 >> 2) + cmd2);
 	}
 }
