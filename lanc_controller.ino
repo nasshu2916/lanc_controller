@@ -74,10 +74,29 @@ void sendCommand(int cmd) {
 }
 
 void serialEvent() {
-	if (Serial.available() >= 2) {
-		int cmd1 = Serial.read();
-		int cmd2 = Serial.read();
-		//Serial.println(cmd);
-		sendCommand((cmd1 >> 2) + cmd2);
+	if (Serial.available() >= 4) {
+		int cmd1 = changeCmd(Serial.read());
+		int cmd2 = changeCmd(Serial.read());
+		int cmd3 = changeCmd(Serial.read());
+		int cmd4 = changeCmd(Serial.read());
+
+
+		Serial.println((cmd1 << 12) + (cmd2 << 8) + (cmd3 << 4) + cmd4,HEX);
+		Serial.println((cmd1 << 12) + (cmd2 << 8) + (cmd3 << 4) + cmd4);
+		Serial.println(0x281A);
+		sendCommand((cmd1 << 12) + (cmd2 << 8) + (cmd3 << 4) + cmd4);
 	}
+}
+
+int changeCmd(int cmd) {
+	if (cmd >= 48 && cmd <= 57) {
+		cmd -= 48;
+	}
+	else if (cmd >= 65 && cmd <= 70) {
+		cmd -= 55;
+	}
+	else {
+		cmd = 0;
+	}
+	return cmd;
 }
